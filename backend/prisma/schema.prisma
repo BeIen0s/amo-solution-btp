@@ -235,8 +235,8 @@ model SubscriptionFeatureFlag {
   isEnabled      Boolean @default(true)
   
   // Relations
-  subscription FeatureFlag  @relation(fields: [featureFlagId], references: [id])
-  featureFlag  Subscription @relation(fields: [subscriptionId], references: [id])
+  featureFlag  FeatureFlag  @relation(fields: [featureFlagId], references: [id])
+  subscription Subscription @relation(fields: [subscriptionId], references: [id])
   
   // Métadonnées
   createdAt    DateTime     @default(now())
