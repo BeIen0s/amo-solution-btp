@@ -16,6 +16,7 @@ import DashboardLayout from '@/components/layouts/DashboardLayout';
 
 // Pages
 import LoginPage from '@/pages/auth/LoginPage';
+import RegisterPage from '@/pages/auth/RegisterPage';
 import DashboardPage from '@/pages/dashboard/DashboardPage';
 import ClientsPage from '@/pages/clients/ClientsPage';
 import DevisPage from '@/pages/devis/DevisPage';
@@ -58,6 +59,7 @@ function App() {
           </PublicRoute>
         }>
           <Route path="login" element={<LoginPage />} />
+          <Route path="register" element={<RegisterPage />} />
           <Route index element={<Navigate to="/auth/login" replace />} />
         </Route>
 

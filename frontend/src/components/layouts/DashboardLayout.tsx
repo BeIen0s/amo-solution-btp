@@ -1,8 +1,18 @@
 import React from 'react';
-import { Outlet, Link, useLocation } from 'react-router-dom';
+import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
+import { useAuthStore } from '@/store/authStore';
+import toast from 'react-hot-toast';
 
 const DashboardLayout: React.FC = () => {
   const location = useLocation();
+  const navigate = useNavigate();
+  const { user, logout } = useAuthStore();
+
+  const handleLogout = () => {
+    logout();
+    toast.success('Déconnexion réussie');
+    navigate('/auth/login');
+  };
 
   const navigation = [
     { name: 'Dashboard', href: '/app', icon: '📊' },
@@ -52,10 +62,22 @@ const DashboardLayout: React.FC = () => {
           <div className="p-4 border-t border-gray-200">
             <div className="flex items-center">
               <div className="flex-1">
-                <p className="text-sm font-medium text-gray-900">Utilisateur</p>
-                <p className="text-xs text-gray-500">admin@amo-solution.com</p>
+                <p className="text-sm font-medium text-gray-900">{user?.name || 'Utilisateur'}</p>
+                <p className="text-xs text-gray-500">{user?.email || 'Non connecté'}</p>
+                {user?.role && (
+                  <p className="text-xs text-blue-600 font-medium">
+                    {user.role === 'admin' ? 'Administrateur' 
+                      : user.role === 'manager' ? 'Manager'
+                      : user.role === 'comptable' ? 'Comptable'
+                      : 'Utilisateur'}
+                  </p>
+                )}
               </div>
-              <button className="ml-3 p-2 text-gray-400 hover:text-gray-500">
+              <button 
+                onClick={handleLogout}
+                className="ml-3 p-2 text-gray-400 hover:text-red-500 transition-colors"
+                title="Déconnexion"
+              >
                 <span>⏻</span>
               </button>
             </div>

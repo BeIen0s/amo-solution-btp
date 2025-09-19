@@ -1,23 +1,29 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { useAuthStore } from '@/store/authStore';
+import toast from 'react-hot-toast';
 
 const LoginPage: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
+  const { login, isLoading } = useAuthStore();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsLoading(true);
+    
+    if (!email || !password) {
+      toast.error('Veuillez remplir tous les champs');
+      return;
+    }
 
-    // Simulation de connexion - à remplacer par l'API réelle
-    setTimeout(() => {
-      setIsLoading(false);
-      // Pour l'instant, on redirige directement vers le dashboard
-      // Dans la vraie version, on vérifiera les credentials
+    try {
+      await login(email, password);
+      toast.success('Connexion réussie ! Bienvenue.');
       navigate('/app');
-    }, 1000);
+    } catch (error) {
+      toast.error('Erreur de connexion. Veuillez réessayer.');
+    }
   };
 
   return (
@@ -102,13 +108,71 @@ const LoginPage: React.FC = () => {
         </p>
       </div>
 
-      {/* Demo credentials */}
-      <div className="mt-8 p-4 bg-blue-50 rounded-lg">
-        <p className="text-sm text-blue-800 font-medium">Démonstration :</p>
-        <p className="text-xs text-blue-700 mt-1">
-          Email : admin@amo-solution.com<br />
-          Mot de passe : Admin123!@#
-        </p>
+      {/* Demo accounts */}
+      <div className="mt-8 space-y-4">
+        <div className="p-4 bg-blue-50 rounded-lg">
+          <p className="text-sm text-blue-800 font-medium mb-3">🚀 Comptes de Test Disponibles :</p>
+          
+          <div className="grid gap-2 text-xs">
+            <div className="flex justify-between items-center p-2 bg-white rounded border">
+              <div>
+                <span className="font-medium text-blue-900">admin@demo.com</span>
+                <span className="text-blue-700 ml-2">(Administrateur)</span>
+              </div>
+              <button 
+                onClick={() => { setEmail('admin@demo.com'); setPassword('demo123'); }}
+                className="text-blue-600 hover:text-blue-800 text-xs px-2 py-1 rounded bg-blue-100 hover:bg-blue-200"
+              >
+                Utiliser
+              </button>
+            </div>
+            
+            <div className="flex justify-between items-center p-2 bg-white rounded border">
+              <div>
+                <span className="font-medium text-green-900">user@demo.com</span>
+                <span className="text-green-700 ml-2">(Utilisateur)</span>
+              </div>
+              <button 
+                onClick={() => { setEmail('user@demo.com'); setPassword('demo123'); }}
+                className="text-green-600 hover:text-green-800 text-xs px-2 py-1 rounded bg-green-100 hover:bg-green-200"
+              >
+                Utiliser
+              </button>
+            </div>
+            
+            <div className="flex justify-between items-center p-2 bg-white rounded border">
+              <div>
+                <span className="font-medium text-purple-900">manager@demo.com</span>
+                <span className="text-purple-700 ml-2">(Manager)</span>
+              </div>
+              <button 
+                onClick={() => { setEmail('manager@demo.com'); setPassword('demo123'); }}
+                className="text-purple-600 hover:text-purple-800 text-xs px-2 py-1 rounded bg-purple-100 hover:bg-purple-200"
+              >
+                Utiliser
+              </button>
+            </div>
+            
+            <div className="flex justify-between items-center p-2 bg-white rounded border">
+              <div>
+                <span className="font-medium text-orange-900">comptable@demo.com</span>
+                <span className="text-orange-700 ml-2">(Comptable)</span>
+              </div>
+              <button 
+                onClick={() => { setEmail('comptable@demo.com'); setPassword('demo123'); }}
+                className="text-orange-600 hover:text-orange-800 text-xs px-2 py-1 rounded bg-orange-100 hover:bg-orange-200"
+              >
+                Utiliser
+              </button>
+            </div>
+          </div>
+        </div>
+        
+        <div className="p-3 bg-green-50 rounded-lg">
+          <p className="text-xs text-green-800">
+            ✨ <strong>Ou utilisez n'importe quel email + mot de passe</strong> - Un compte sera créé automatiquement !
+          </p>
+        </div>
       </div>
     </div>
   );

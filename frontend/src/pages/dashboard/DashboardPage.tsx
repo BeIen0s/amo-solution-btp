@@ -1,6 +1,8 @@
 import React from 'react';
+import { useAuthStore } from '@/store/authStore';
 
 const DashboardPage: React.FC = () => {
+  const { user } = useAuthStore();
   const stats = [
     { name: 'Clients actifs', value: '24', change: '+4.75%', changeType: 'positive' },
     { name: 'Devis en cours', value: '12', change: '+54.02%', changeType: 'positive' },
@@ -19,10 +21,31 @@ const DashboardPage: React.FC = () => {
     <div className="space-y-6">
       {/* Welcome Section */}
       <div className="bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg p-6 text-white">
-        <h1 className="text-3xl font-bold">Bonjour ! 👋</h1>
-        <p className="mt-2 text-blue-100">
-          Voici un aperçu de votre activité aujourd'hui
-        </p>
+        <h1 className="text-3xl font-bold">Bonjour {user?.name} ! 👋</h1>
+        <div className="mt-2 flex items-center gap-3">
+          <p className="text-blue-100">
+            Voici un aperçu de votre activité aujourd'hui
+          </p>
+          <span className={`inline-flex px-3 py-1 rounded-full text-xs font-medium ${
+            user?.role === 'admin' 
+              ? 'bg-red-100 text-red-800'
+              : user?.role === 'manager'
+              ? 'bg-purple-100 text-purple-800' 
+              : user?.role === 'comptable'
+              ? 'bg-orange-100 text-orange-800'
+              : 'bg-green-100 text-green-800'
+          }`}>
+            {user?.role === 'admin' ? 'Administrateur' 
+              : user?.role === 'manager' ? 'Manager'
+              : user?.role === 'comptable' ? 'Comptable'
+              : 'Utilisateur'}
+          </span>
+        </div>
+        {user?.company && (
+          <p className="text-blue-200 text-sm mt-1">
+            {user.company}
+          </p>
+        )}
       </div>
 
       {/* Stats Grid */}
