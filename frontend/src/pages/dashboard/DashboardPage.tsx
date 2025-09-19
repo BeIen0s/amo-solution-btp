@@ -76,43 +76,83 @@ const DashboardPage: React.FC = () => {
     // Ajouter les devis récents
     const recentDevis = devis
       .sort((a, b) => new Date(b.dateCreation).getTime() - new Date(a.dateCreation).getTime())
-      .slice(0, 3)
-      .map(d => ({
-        id: `devis-${d.id}`,
-        type: 'Devis',
-        client: `${d.clientInfo.prenom} ${d.clientInfo.nom}`,
-        company: d.clientInfo.entreprise,
-        amount: d.totalTTC,
-        status: d.status === 'brouillon' ? 'Brouillon' : 
-                d.status === 'envoye' ? 'Envoyé' :
-                d.status === 'accepte' ? 'Accepté' :
-                d.status === 'refuse' ? 'Refusé' : 'Expiré',
-        date: d.dateCreation
-      }));
+      .slice(0, 4)
+      .map(d => {
+        const isExpired = new Date() > new Date(d.dateExpiration);
+        return {
+          id: `devis-${d.id}`,
+          type: 'Devis',
+          title: d.title,
+          client: `${d.clientInfo.prenom} ${d.clientInfo.nom}`.trim() || 'Client',
+          company: d.clientInfo.entreprise,
+          amount: d.totalTTC,
+          status: d.status === 'brouillon' ? 'Brouillon' : 
+                  d.status === 'envoye' ? (isExpired ? 'Expiré' : 'Envoyé') :
+                  d.status === 'accepte' ? 'Accepté' :
+                  d.status === 'refuse' ? 'Refusé' : 'Expiré',
+          date: d.dateCreation,
+          priority: d.status === 'envoye' && !isExpired ? 'high' : 'normal',
+          icon: '📋',
+          color: 'blue'
+        };
+      });
     
     // Ajouter les factures récentes
     const recentFactures = factures
       .sort((a, b) => new Date(b.dateCreation).getTime() - new Date(a.dateCreation).getTime())
-      .slice(0, 3)
-      .map(f => ({
-        id: `facture-${f.id}`,
-        type: 'Facture',
-        client: `${f.clientInfo.prenom} ${f.clientInfo.nom}`,
-        company: f.clientInfo.entreprise,
-        amount: f.totalTTC,
-        status: f.status === 'brouillon' ? 'Brouillon' :
-                f.status === 'envoyee' ? 'Envoyée' :
-                f.status === 'payee' ? 'Payée' :
-                f.status === 'partiellement_payee' ? 'Part. payée' :
-                f.status === 'en_retard' ? 'En retard' : 'Annulée',
-        date: f.dateCreation
+      .slice(0, 4)
+      .map(f => {
+        const isOverdue = f.status !== 'payee' && new Date() > new Date(f.dateEcheance);
+        return {
+          id: `facture-${f.id}`,
+          type: 'Facture',
+          title: f.title,
+          client: `${f.clientInfo.prenom} ${f.clientInfo.nom}`.trim() || 'Client',
+          company: f.clientInfo.entreprise,
+          amount: f.totalTTC,
+          status: isOverdue ? 'En retard' :
+                  f.status === 'brouillon' ? 'Brouillon' :
+                  f.status === 'envoyee' ? 'Envoyée' :
+                  f.status === 'payee' ? 'Payée' :
+                  f.status === 'partiellement_payee' ? 'Part. payée' : 'Annulée',
+          date: f.dateCreation,
+          dueDate: f.dateEcheance,
+          priority: isOverdue ? 'high' : f.status === 'envoyee' ? 'medium' : 'normal',
+          icon: '💰',
+          color: 'green'
+        };
+      });
+    
+    // Ajouter les clients récents (optionnel)
+    const recentClients = clients
+      .sort((a, b) => new Date(b.dateCreation).getTime() - new Date(a.dateCreation).getTime())
+      .slice(0, 2)
+      .map(c => ({
+        id: `client-${c.id}`,
+        type: 'Client',
+        title: 'Nouveau client ajouté',
+        client: `${c.prenom} ${c.nom}`.trim() || 'Client',
+        company: c.entreprise,
+        amount: 0,
+        status: c.type === 'particulier' ? 'Particulier' : 
+                c.type === 'entreprise' ? 'Entreprise' : 'Collectivité',
+        date: c.dateCreation,
+        priority: 'normal',
+        icon: '👤',
+        color: 'purple'
       }));
     
-    activities.push(...recentDevis, ...recentFactures);
+    activities.push(...recentDevis, ...recentFactures, ...recentClients);
     
     return activities
-      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-      .slice(0, 6);
+      .sort((a, b) => {
+        // Prioriser les éléments urgents
+        if (a.priority === 'high' && b.priority !== 'high') return -1;
+        if (b.priority === 'high' && a.priority !== 'high') return 1;
+        // Ensuite trier par date
+        return new Date(b.date).getTime() - new Date(a.date).getTime();
+      })
+      .slice(0, 8); // Afficher jusqu'à 8 activités
   };
   
   const recentActivities = getRecentActivities();
@@ -122,6 +162,32 @@ const DashboardPage: React.FC = () => {
       style: 'currency',
       currency: 'EUR'
     }).format(amount);
+  };
+  
+  const getTimeAgo = (dateString: string) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+    
+    if (diffDays === 0) {
+      const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+      if (diffHours === 0) {
+        const diffMinutes = Math.floor(diffMs / (1000 * 60));
+        return diffMinutes <= 1 ? 'À l\'instant' : `Il y a ${diffMinutes} min`;
+      }
+      return diffHours === 1 ? 'Il y a 1h' : `Il y a ${diffHours}h`;
+    } else if (diffDays === 1) {
+      return 'Hier';
+    } else if (diffDays < 7) {
+      return `Il y a ${diffDays} jours`;
+    } else {
+      return date.toLocaleDateString('fr-FR', {
+        day: 'numeric',
+        month: 'short',
+        year: date.getFullYear() !== now.getFullYear() ? 'numeric' : undefined
+      });
+    }
   };
   
   const formatPercentage = (current: number, previous: number) => {
@@ -314,102 +380,182 @@ const DashboardPage: React.FC = () => {
       <div className="bg-white rounded-lg shadow-sm border border-gray-200">
         <div className="px-6 py-4 border-b border-gray-200">
           <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-gray-900">Activité récente</h2>
+            <div className="flex items-center space-x-3">
+              <h2 className="text-lg font-semibold text-gray-900">Activité récente</h2>
+              {recentActivities.filter(a => a.priority === 'high').length > 0 && (
+                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                  <span className="w-1.5 h-1.5 bg-red-400 rounded-full mr-1.5"></span>
+                  {recentActivities.filter(a => a.priority === 'high').length} urgent(s)
+                </span>
+              )}
+            </div>
             <span className="text-xs text-gray-500">
               {recentActivities.length} éléments
             </span>
           </div>
         </div>
-        <div className="divide-y divide-gray-200">
-          {recentActivities.length === 0 ? (
-            <div className="px-6 py-8 text-center">
-              <div className="text-gray-400 text-4xl mb-4">📅</div>
-              <h3 className="text-sm font-medium text-gray-900 mb-1">Aucune activité récente</h3>
-              <p className="text-xs text-gray-500">Les dernières activités apparaîtront ici</p>
-            </div>
-          ) : (
-            recentActivities.map((activity) => (
-              <div key={activity.id} className="px-6 py-4 flex items-center justify-between hover:bg-gray-50">
-                <div className="flex items-center space-x-3">
-                  <div className="flex-shrink-0">
-                    <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                      activity.type === 'Devis' ? 'bg-blue-100' : 'bg-green-100'
-                    }`}>
-                      <span className={`text-sm font-medium ${
-                        activity.type === 'Devis' ? 'text-blue-600' : 'text-green-600'
+        
+        <div className="max-h-96 overflow-y-auto">
+          <div className="divide-y divide-gray-200">
+            {recentActivities.length === 0 ? (
+              <div className="px-6 py-8 text-center">
+                <div className="text-gray-400 text-4xl mb-4">📅</div>
+                <h3 className="text-sm font-medium text-gray-900 mb-1">Aucune activité récente</h3>
+                <p className="text-xs text-gray-500">Les dernières activités apparaîtront ici</p>
+                <div className="mt-4">
+                  <button 
+                    onClick={() => handleQuickAction('devis')}
+                    className="text-sm text-blue-600 hover:text-blue-800"
+                  >
+                    Créer votre premier devis →
+                  </button>
+                </div>
+              </div>
+            ) : (
+              recentActivities.map((activity) => (
+                <div 
+                  key={activity.id} 
+                  className={`px-6 py-4 flex items-start justify-between hover:bg-gray-50 transition-colors ${
+                    activity.priority === 'high' ? 'border-l-4 border-red-400 bg-red-50/30' :
+                    activity.priority === 'medium' ? 'border-l-4 border-yellow-400 bg-yellow-50/30' : ''
+                  }`}
+                >
+                  <div className="flex items-start space-x-4 flex-1">
+                    <div className="flex-shrink-0">
+                      <div className={`w-12 h-12 rounded-full flex items-center justify-center shadow-sm ${
+                        activity.color === 'blue' ? 'bg-blue-100 border border-blue-200' :
+                        activity.color === 'green' ? 'bg-green-100 border border-green-200' :
+                        activity.color === 'purple' ? 'bg-purple-100 border border-purple-200' :
+                        'bg-gray-100 border border-gray-200'
                       }`}>
-                        {activity.type === 'Devis' ? '📋' : '💰'}
-                      </span>
+                        <span className={`text-base ${
+                          activity.color === 'blue' ? 'text-blue-600' :
+                          activity.color === 'green' ? 'text-green-600' :
+                          activity.color === 'purple' ? 'text-purple-600' :
+                          'text-gray-600'
+                        }`}>
+                          {activity.icon}
+                        </span>
+                      </div>
+                    </div>
+                    
+                    <div className="flex-1 min-w-0">
+                      {/* Ligne principale */}
+                      <div className="flex items-center space-x-2 mb-1">
+                        <p className="text-sm font-semibold text-gray-900 truncate">
+                          {activity.type}
+                        </p>
+                        {activity.priority === 'high' && (
+                          <span className="flex-shrink-0 inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700">
+                            ⚡ Urgent
+                          </span>
+                        )}
+                      </div>
+                      
+                      {/* Titre/Description */}
+                      {activity.title && (
+                        <p className="text-sm text-gray-600 truncate mb-1">
+                          {activity.title}
+                        </p>
+                      )}
+                      
+                      {/* Client et entreprise */}
+                      <div className="flex items-center space-x-2 text-xs text-gray-500">
+                        <span className="font-medium text-gray-700">{activity.client}</span>
+                        {activity.company && (
+                          <>
+                            <span>•</span>
+                            <span className="truncate">{activity.company}</span>
+                          </>
+                        )}
+                      </div>
+                      
+                      {/* Montant si applicable */}
+                      {activity.amount > 0 && (
+                        <div className="mt-1">
+                          <span className="text-sm font-semibold text-gray-800">
+                            {formatCurrency(activity.amount)}
+                          </span>
+                        </div>
+                      )}
                     </div>
                   </div>
-                  <div className="flex-1">
-                    <div className="flex items-center space-x-2">
-                      <p className="text-sm font-medium text-gray-900">
-                        {activity.type}
-                      </p>
-                      <span className="text-gray-400">•</span>
-                      <p className="text-sm text-gray-600">
-                        {activity.client}
-                      </p>
-                    </div>
-                    <div className="flex items-center space-x-2 mt-1">
-                      <p className="text-sm font-semibold text-gray-700">
-                        {formatCurrency(activity.amount)}
-                      </p>
-                      {activity.company && (
-                        <>
-                          <span className="text-gray-400">•</span>
-                          <p className="text-xs text-gray-500">{activity.company}</p>
-                        </>
+                  
+                  {/* Statut et date */}
+                  <div className="flex flex-col items-end space-y-2 ml-4">
+                    <span className={`inline-flex px-2.5 py-1 text-xs font-semibold rounded-full whitespace-nowrap ${
+                      activity.status === 'Payée' || activity.status === 'Accepté' 
+                        ? 'bg-green-100 text-green-800'
+                        : activity.status === 'Envoyée' || activity.status === 'Envoyé'
+                        ? 'bg-blue-100 text-blue-800'
+                        : activity.status === 'En retard' || activity.status === 'Expiré'
+                        ? 'bg-red-100 text-red-800'
+                        : activity.status === 'Part. payée'
+                        ? 'bg-yellow-100 text-yellow-800'
+                        : activity.status === 'Brouillon'
+                        ? 'bg-gray-100 text-gray-600'
+                        : 'bg-purple-100 text-purple-800'
+                    }`}>
+                      {activity.status}
+                    </span>
+                    
+                    <div className="text-right">
+                      <div className="text-xs text-gray-400">
+                        {getTimeAgo(activity.date)}
+                      </div>
+                      
+                      {activity.dueDate && activity.type === 'Facture' && activity.status !== 'Payée' && (
+                        <div className={`text-xs mt-1 ${
+                          new Date() > new Date(activity.dueDate) ? 'text-red-500 font-medium' : 'text-gray-400'
+                        }`}>
+                          Échéance: {new Date(activity.dueDate).toLocaleDateString('fr-FR', {
+                            day: 'numeric',
+                            month: 'short'
+                          })}
+                        </div>
                       )}
                     </div>
                   </div>
                 </div>
-                <div className="flex flex-col items-end space-y-1">
-                  <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                    activity.status === 'Payée' || activity.status === 'Accepté' 
-                      ? 'bg-green-100 text-green-800'
-                      : activity.status === 'Envoyée' || activity.status === 'Envoyé'
-                      ? 'bg-blue-100 text-blue-800'
-                      : activity.status === 'En retard'
-                      ? 'bg-red-100 text-red-800'
-                      : activity.status === 'Part. payée'
-                      ? 'bg-yellow-100 text-yellow-800'
-                      : 'bg-gray-100 text-gray-800'
-                  }`}>
-                    {activity.status}
-                  </span>
-                  <span className="text-xs text-gray-400">
-                    {new Date(activity.date).toLocaleDateString('fr-FR', {
-                      day: 'numeric',
-                      month: 'short'
-                    })}
-                  </span>
-                </div>
-              </div>
-            ))
-          )}
+              ))
+            )}
+          </div>
         </div>
         
         {recentActivities.length > 0 && (
-          <div className="px-6 py-3 bg-gray-50 border-t border-gray-200">
+          <div className="px-6 py-4 bg-gray-50 border-t border-gray-200">
             <div className="flex justify-between items-center">
-              <span className="text-xs text-gray-500">
-                Dernières activités
-              </span>
-              <div className="flex space-x-2">
+              <div className="flex items-center space-x-4">
+                <span className="text-xs text-gray-500">
+                  {recentActivities.length} activité(s) récente(s)
+                </span>
+                {recentActivities.filter(a => a.priority === 'high').length > 0 && (
+                  <span className="text-xs text-red-600 font-medium">
+                    {recentActivities.filter(a => a.priority === 'high').length} élément(s) urgent(s)
+                  </span>
+                )}
+              </div>
+              
+              <div className="flex items-center space-x-3">
+                <button 
+                  onClick={() => navigate('/clients')}
+                  className="text-xs text-purple-600 hover:text-purple-800 font-medium"
+                >
+                  Clients
+                </button>
+                <span className="text-gray-300">•</span>
                 <button 
                   onClick={() => navigate('/devis')}
-                  className="text-xs text-blue-600 hover:text-blue-800"
+                  className="text-xs text-blue-600 hover:text-blue-800 font-medium"
                 >
-                  Tous les devis
+                  Devis
                 </button>
                 <span className="text-gray-300">•</span>
                 <button 
                   onClick={() => navigate('/factures')}
-                  className="text-xs text-green-600 hover:text-green-800"
+                  className="text-xs text-green-600 hover:text-green-800 font-medium"
                 >
-                  Toutes les factures
+                  Factures
                 </button>
               </div>
             </div>
