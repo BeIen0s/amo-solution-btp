@@ -1,42 +1,14 @@
-# Configuration Netlify pour A.M.O Solution BTP - Version Simplifiée
+# Configuration Netlify Ultra-Simple
 
 [build]
-  # Répertoire de publication
-  publish = "dist"
-  # Répertoire de base - Le frontend uniquement
-  base = "frontend/"
-  # Commande de build simple
-  command = "npm run build"
+  publish = "frontend/dist"
+  command = "cd frontend && npm install --legacy-peer-deps && npm run build"
 
-# Variables d'environnement
 [build.environment]
   NODE_VERSION = "18"
   NPM_VERSION = "9"
-  VITE_API_URL = "https://your-backend-url.com"
 
-# Headers de sécurité essentiels
-[[headers]]
-  for = "/*"
-  [headers.values]
-    X-Frame-Options = "DENY"
-    X-Content-Type-Options = "nosniff"
-    X-XSS-Protection = "1; mode=block"
-    Referrer-Policy = "strict-origin-when-cross-origin"
-
-# Cache pour les assets
-[[headers]]
-  for = "/assets/*"
-  [headers.values]
-    Cache-Control = "public, max-age=31536000, immutable"
-
-# Redirections API vers backend
-[[redirects]]
-  from = "/api/*"
-  to = "https://your-backend-url.com/api/:splat"
-  status = 200
-  force = true
-
-# SPA routing - DOIT ÊTRE EN DERNIER
+# SPA routing
 [[redirects]]
   from = "/*"
   to = "/index.html"
