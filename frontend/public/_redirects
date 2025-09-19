@@ -1,0 +1,13 @@
+# Redirections pour React Router (SPA)
+/*    /index.html   200
+
+# Redirections API vers le backend déployé
+/api/*  https://your-backend-url.herokuapp.com/api/:splat  200
+
+# Headers de sécurité
+/*
+  X-Frame-Options: DENY
+  X-Content-Type-Options: nosniff
+  X-XSS-Protection: 1; mode=block
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=()
