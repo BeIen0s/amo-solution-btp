@@ -1,0 +1,16 @@
+# Instructions pour connecter à GitHub
+
+Une fois que vous avez créé le repository sur GitHub, exécutez ces commandes :
+
+# Remplacez YOUR_USERNAME par votre nom d'utilisateur GitHub
+git remote add origin https://github.com/YOUR_USERNAME/amo-solution-btp.git
+
+# Pousser le code
+git branch -M main
+git push -u origin main
+
+# Ou si vous utilisez master :
+git push -u origin master
+
+# Vérifier que c'est connecté
+git remote -v

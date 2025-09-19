@@ -1,23 +1,20 @@
-# Configuration Netlify pour A.M.O Solution BTP
+# Configuration Netlify pour A.M.O Solution BTP - Version Simplifiée
 
 [build]
-  # Répertoire de build du frontend
-  publish = "frontend/dist"
-  # Commande de build
-  command = "cd frontend && npm run build"
-  # Répertoire de base
-  base = "/"
+  # Répertoire de publication
+  publish = "dist"
+  # Répertoire de base - Le frontend uniquement
+  base = "frontend/"
+  # Commande de build simple
+  command = "npm run build"
 
-# Variables d'environnement pour la production
+# Variables d'environnement
 [build.environment]
   NODE_VERSION = "18"
   NPM_VERSION = "9"
+  VITE_API_URL = "https://your-backend-url.com"
 
-# Configuration des fonctions serverless (si nécessaire)
-[functions]
-  directory = "netlify/functions"
-
-# Headers de sécurité globaux
+# Headers de sécurité essentiels
 [[headers]]
   for = "/*"
   [headers.values]
@@ -25,74 +22,22 @@
     X-Content-Type-Options = "nosniff"
     X-XSS-Protection = "1; mode=block"
     Referrer-Policy = "strict-origin-when-cross-origin"
-    Content-Security-Policy = "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://api.amo-solution-btp.com"
 
-# Headers pour les assets statiques avec cache long
+# Cache pour les assets
 [[headers]]
   for = "/assets/*"
   [headers.values]
     Cache-Control = "public, max-age=31536000, immutable"
 
-# Headers pour les fichiers JS/CSS
-[[headers]]
-  for = "*.js"
-  [headers.values]
-    Cache-Control = "public, max-age=31536000, immutable"
+# Redirections API vers backend
+[[redirects]]
+  from = "/api/*"
+  to = "https://your-backend-url.com/api/:splat"
+  status = 200
+  force = true
 
-[[headers]]
-  for = "*.css"
-  [headers.values]
-    Cache-Control = "public, max-age=31536000, immutable"
-
-# Configuration pour le SPA (Single Page Application)
+# SPA routing - DOIT ÊTRE EN DERNIER
 [[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200
-  conditions = {Role = ["admin"], Country = ["US"]}
-
-# Redirections API vers le backend
-[[redirects]]
-  from = "/api/*"
-  to = "https://your-backend-url.railway.app/api/:splat"
-  status = 200
-  force = true
-
-# Redirection pour la documentation API
-[[redirects]]
-  from = "/docs/*"
-  to = "https://your-backend-url.railway.app/api/docs/:splat"
-  status = 200
-  force = true
-
-# Gestion des erreurs
-[[redirects]]
-  from = "/404"
-  to = "/index.html"
-  status = 200
-
-# Configuration du déploiement par branche
-[context.production]
-  command = "cd frontend && npm run build"
-  
-[context.staging]
-  command = "cd frontend && npm run build"
-  
-[context.branch-deploy]
-  command = "cd frontend && npm run build"
-
-# Configuration des notifications
-[build.processing]
-  skip_processing = false
-
-[build.processing.css]
-  bundle = true
-  minify = true
-
-[build.processing.js]
-  bundle = true
-  minify = true
-
-[build.processing.html]
-  pretty_urls = true
-  canonical_urls = true

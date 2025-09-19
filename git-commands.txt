@@ -1,0 +1,31 @@
+# 🚀 Commandes Git à Exécuter
+
+## Étape 1 : Créer le repository sur GitHub
+Allez sur : https://github.com/new
+
+Configuration :
+- Repository name: amo-solution-btp  
+- Description: A.M.O Solution BTP - Application web SaaS modulaire pour le secteur BTP
+- Public ou Private (votre choix)
+- ❌ NE PAS cocher les options d'initialisation
+
+## Étape 2 : Connecter et pousser (commandes à copier-coller)
+
+# Remplacez YOUR_USERNAME par votre nom d'utilisateur GitHub réel
+git remote add origin https://github.com/YOUR_USERNAME/amo-solution-btp.git
+
+# Vérifier le statut
+git status
+
+# Pousser tout votre code vers GitHub
+git push -u origin master
+
+# Vérifier que la connexion fonctionne
+git remote -v
+
+## ✅ Résultat attendu
+Une fois ces commandes exécutées, votre code sera sur GitHub et prêt pour Netlify !
+
+## 🎯 Exemple avec un nom d'utilisateur fictif
+Si votre username GitHub était "john_doe", la commande serait :
+git remote add origin https://github.com/john_doe/amo-solution-btp.git
