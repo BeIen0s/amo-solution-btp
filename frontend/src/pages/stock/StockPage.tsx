@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useStockStore } from '@/store/stockStore';
+import ProductModal from '@/components/modals/ProductModal';
 import type { Product, StockAlert } from '@/types/stock';
 
 type ModalState = {
@@ -418,6 +419,16 @@ const StockPage: React.FC = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Modal pour ajouter/éditer un produit */}
+      {(modalState.type === 'create' || modalState.type === 'edit') && (
+        <ProductModal
+          isOpen={true}
+          onClose={closeModal}
+          product={modalState.product}
+          mode={modalState.type}
+        />
       )}
     </div>
   );

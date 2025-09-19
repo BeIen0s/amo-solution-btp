@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useFactureStore } from '@/store/factureStore';
+import FactureModal from '@/components/modals/FactureModal';
 import type { Facture, Payment } from '@/types/facture';
 
 type ModalState = {
@@ -400,6 +401,16 @@ const FacturesPage: React.FC = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Modal pour ajouter/éditer une facture */}
+      {(modalState.type === 'create' || modalState.type === 'edit') && (
+        <FactureModal
+          isOpen={true}
+          onClose={closeModal}
+          facture={modalState.facture}
+          mode={modalState.type}
+        />
       )}
     </div>
   );

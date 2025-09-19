@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useDevisStore } from '@/store/devisStore';
+import DevisModal from '@/components/modals/DevisModal';
 import type { Devis } from '@/types/devis';
 
 type ModalState = {
@@ -364,6 +365,16 @@ const DevisPage: React.FC = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Modal pour ajouter/éditer un devis */}
+      {(modalState.type === 'create' || modalState.type === 'edit') && (
+        <DevisModal
+          isOpen={true}
+          onClose={closeModal}
+          devis={modalState.devis}
+          mode={modalState.type}
+        />
       )}
     </div>
   );
