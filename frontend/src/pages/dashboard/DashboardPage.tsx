@@ -7,7 +7,7 @@ import { useFactureStore } from '@/store/factureStore';
 import { useStockStore } from '@/store/stockStore';
 import DevisModal from '@/components/modals/DevisModal';
 import FactureModal from '@/components/modals/FactureModal';
-import { ClientModal } from '@/pages/clients/components/ClientModal';
+import ClientModal from '@/pages/clients/components/ClientModal';
 
 type ModalState = {
   type: 'devis' | 'facture' | 'client' | null;
