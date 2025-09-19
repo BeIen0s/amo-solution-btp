@@ -1,4 +1,4 @@
-# Configuration Netlify Ultra-Simple
+# Configuration Netlify pour A.M.O Solution BTP
 
 [build]
   publish = "frontend/dist"
@@ -8,7 +8,30 @@
   NODE_VERSION = "18"
   NPM_VERSION = "9"
 
-# SPA routing
+# Headers de sécurité
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "DENY"
+    X-Content-Type-Options = "nosniff"
+    X-XSS-Protection = "1; mode=block"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Permissions-Policy = "camera=(), microphone=(), geolocation=(), payment=()"
+
+# Headers pour les assets avec cache
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+# Redirections API vers backend
+[[redirects]]
+  from = "/api/*"
+  to = "https://your-backend-url.com/api/:splat"
+  status = 200
+  force = true
+
+# SPA routing - DOIT Être EN DERNIER
 [[redirects]]
   from = "/*"
   to = "/index.html"
