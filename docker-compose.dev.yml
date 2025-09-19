@@ -1,0 +1,107 @@
+version: '3.8'
+
+services:
+  # Base de données PostgreSQL
+  postgres:
+    image: postgres:15-alpine
+    container_name: amo-postgres-dev
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-amo_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-amo_password}
+      POSTGRES_DB: ${POSTGRES_DB:-amo_solution_btp}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./backend/prisma/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    networks:
+      - amo-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-amo_user}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis pour le cache et les sessions
+  redis:
+    image: redis:7-alpine
+    container_name: amo-redis-dev
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - amo-network
+    restart: unless-stopped
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-redis_password}
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # MinIO pour le stockage de fichiers (développement)
+  minio:
+    image: minio/minio:latest
+    container_name: amo-minio-dev
+    environment:
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-minioadmin}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-minioadmin}
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+    networks:
+      - amo-network
+    command: server /data --console-address ":9001"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+
+  # Mailhog pour intercepter les emails en développement
+  mailhog:
+    image: mailhog/mailhog:latest
+    container_name: amo-mailhog-dev
+    ports:
+      - "1025:1025"  # SMTP
+      - "8025:8025"  # Web UI
+    networks:
+      - amo-network
+    restart: unless-stopped
+
+  # Prisma Studio (optionnel, pour visualiser la BDD)
+  prisma-studio:
+    image: node:18-alpine
+    container_name: amo-prisma-studio-dev
+    working_dir: /app
+    command: sh -c "npm install -g prisma && prisma studio --port 5555 --hostname 0.0.0.0"
+    ports:
+      - "5555:5555"
+    volumes:
+      - ./backend:/app
+    networks:
+      - amo-network
+    depends_on:
+      - postgres
+    environment:
+      DATABASE_URL: "postgresql://${POSTGRES_USER:-amo_user}:${POSTGRES_PASSWORD:-amo_password}@postgres:5432/${POSTGRES_DB:-amo_solution_btp}?schema=public"
+    profiles:
+      - tools
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  minio_data:
+    driver: local
+
+networks:
+  amo-network:
+    driver: bridge
+    name: amo-solution-btp-network

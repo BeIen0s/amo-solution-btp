@@ -1,0 +1,66 @@
+# ===== ÉTAPE 1: Construction =====
+FROM node:18-alpine AS builder
+
+# Installer les dépendances système nécessaires
+RUN apk add --no-cache python3 make g++
+
+# Définir le répertoire de travail
+WORKDIR /app
+
+# Copier les fichiers de configuration du package
+COPY package*.json ./
+COPY prisma ./prisma/
+
+# Installer les dépendances de production et de développement
+RUN npm ci --only=production && npm cache clean --force
+
+# Copier le code source
+COPY . .
+
+# Générer le client Prisma
+RUN npx prisma generate
+
+# Construire l'application
+RUN npm run build
+
+# ===== ÉTAPE 2: Production =====
+FROM node:18-alpine AS production
+
+# Créer un utilisateur non-root pour la sécurité
+RUN addgroup -g 1001 -S nodejs
+RUN adduser -S nestjs -u 1001
+
+# Installer curl pour les health checks
+RUN apk add --no-cache curl
+
+# Définir le répertoire de travail
+WORKDIR /app
+
+# Copier les fichiers package et prisma depuis l'étape de construction
+COPY --from=builder /app/package*.json ./
+COPY --from=builder /app/prisma ./prisma/
+COPY --from=builder /app/node_modules ./node_modules/
+
+# Copier l'application construite
+COPY --from=builder /app/dist ./dist/
+
+# Créer les répertoires nécessaires et attribuer les permissions
+RUN mkdir -p /app/uploads /app/logs
+RUN chown -R nestjs:nodejs /app
+
+# Passer à l'utilisateur non-root
+USER nestjs
+
+# Exposer le port de l'application
+EXPOSE 3001
+
+# Variables d'environnement par défaut
+ENV NODE_ENV=production
+ENV PORT=3001
+
+# Commande de santé pour Docker
+HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
+  CMD curl -f http://localhost:3001/health || exit 1
+
+# Commande de démarrage
+CMD ["sh", "-c", "npx prisma migrate deploy && node dist/main.js"]

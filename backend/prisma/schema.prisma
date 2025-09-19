@@ -1,0 +1,731 @@
+// ===== CONFIGURATION PRISMA =====
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ===== ÉNUMÉRATIONS =====
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+  PENDING_VERIFICATION
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  EXPIRED
+  CANCELLED
+  PENDING_PAYMENT
+  TRIAL
+}
+
+enum OfferType {
+  VENTE
+  GESTION
+  GESTION_AVANCEE
+  ENTREPRISE
+}
+
+enum DevisStatus {
+  BROUILLON
+  ENVOYE
+  ACCEPTE
+  REFUSE
+  EXPIRE
+}
+
+enum FactureStatus {
+  BROUILLON
+  ENVOYEE
+  PAYEE
+  PARTIELLEMENT_PAYEE
+  EN_RETARD
+  ANNULEE
+}
+
+enum CommandeStatus {
+  EN_ATTENTE
+  CONFIRMEE
+  EN_COURS
+  LIVREE
+  ANNULEE
+}
+
+enum DocumentType {
+  DEVIS
+  FACTURE
+  COMMANDE
+  CONTRAT
+  PV_RECEPTION
+  PPSPS
+  DC4
+  RAPPORT_CHANTIER
+  AUTRE
+}
+
+enum StockMovementType {
+  ENTREE
+  SORTIE
+  TRANSFERT
+  INVENTAIRE
+  PERTE
+}
+
+enum InterventionStatus {
+  PLANIFIEE
+  EN_COURS
+  TERMINEE
+  REPORTEE
+  ANNULEE
+}
+
+enum InterventionType {
+  MAINTENANCE
+  REPARATION
+  INSTALLATION
+  DIAGNOSTIC
+  AUTRE
+}
+
+enum LogLevel {
+  INFO
+  WARNING
+  ERROR
+  CRITICAL
+}
+
+// ===== UTILISATEURS ET AUTHENTIFICATION =====
+model User {
+  id                    String               @id @default(cuid())
+  email                 String               @unique
+  username              String?              @unique
+  firstName             String
+  lastName              String
+  phone                 String?
+  avatar                String?
+  status                UserStatus           @default(ACTIVE)
+  emailVerified         DateTime?
+  
+  // Authentification
+  password              String
+  twoFactorSecret       String?
+  twoFactorEnabled      Boolean              @default(false)
+  lastLoginAt           DateTime?
+  loginAttempts         Int                  @default(0)
+  lockedUntil           DateTime?
+  
+  // Relations
+  roles                 UserRole[]
+  refreshTokens         RefreshToken[]
+  auditLogs            AuditLog[]
+  createdClients       Client[]
+  createdDevis         Devis[]
+  createdFactures      Facture[]
+  timeEntries          TimeEntry[]
+  createdInterventions Intervention[]
+  
+  // Métadonnées
+  createdAt             DateTime             @default(now())
+  updatedAt             DateTime             @updatedAt
+  createdBy             String?
+  updatedBy             String?
+
+  @@map("users")
+}
+
+model Role {
+  id          String     @id @default(cuid())
+  name        String     @unique
+  description String?
+  permissions Json       // Stockage flexible des permissions
+  isDefault   Boolean    @default(false)
+  
+  // Relations
+  users       UserRole[]
+  
+  // Métadonnées
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  @@map("roles")
+}
+
+model UserRole {
+  id     String @id @default(cuid())
+  userId String
+  roleId String
+  
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  
+  // Métadonnées
+  assignedAt DateTime @default(now())
+  assignedBy String?
+
+  @@unique([userId, roleId])
+  @@map("user_roles")
+}
+
+model RefreshToken {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  userId    String
+  expiresAt DateTime
+  isRevoked Boolean  @default(false)
+  
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Métadonnées
+  createdAt DateTime @default(now())
+
+  @@map("refresh_tokens")
+}
+
+// ===== ABONNEMENTS ET FEATURE FLAGS =====
+model Subscription {
+  id            String             @id @default(cuid())
+  name          String
+  offerType     OfferType
+  status        SubscriptionStatus @default(TRIAL)
+  startDate     DateTime
+  endDate       DateTime?
+  trialEndDate  DateTime?
+  autoRenew     Boolean            @default(true)
+  
+  // Relations
+  clients       Client[]
+  featureFlags  SubscriptionFeatureFlag[]
+  
+  // Métadonnées
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+
+  @@map("subscriptions")
+}
+
+model FeatureFlag {
+  id            String                     @id @default(cuid())
+  name          String                     @unique
+  description   String?
+  isActive      Boolean                    @default(true)
+  module        String                     // Module concerné (commercial, achats, etc.)
+  requiredOffer OfferType[]                // Offres qui activent cette fonctionnalité
+  
+  // Relations
+  subscriptions SubscriptionFeatureFlag[]
+  
+  // Métadonnées
+  createdAt     DateTime                   @default(now())
+  updatedAt     DateTime                   @updatedAt
+
+  @@map("feature_flags")
+}
+
+model SubscriptionFeatureFlag {
+  id             String @id @default(cuid())
+  subscriptionId String
+  featureFlagId  String
+  isEnabled      Boolean @default(true)
+  
+  // Relations
+  subscription FeatureFlag  @relation(fields: [featureFlagId], references: [id])
+  featureFlag  Subscription @relation(fields: [subscriptionId], references: [id])
+  
+  // Métadonnées
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  @@unique([subscriptionId, featureFlagId])
+  @@map("subscription_feature_flags")
+}
+
+// ===== CLIENTS =====
+model Client {
+  id             String  @id @default(cuid())
+  name           String
+  type           String  // PARTICULIER, ENTREPRISE, COLLECTIVITE
+  siret          String?
+  vatNumber      String?
+  
+  // Contact principal
+  contactName    String?
+  email          String?
+  phone          String?
+  mobile         String?
+  
+  // Adresse
+  address        String?
+  postalCode     String?
+  city           String?
+  country        String  @default("France")
+  
+  // Informations commerciales
+  subscriptionId String?
+  subscription   Subscription? @relation(fields: [subscriptionId], references: [id])
+  isProspect     Boolean       @default(true)
+  source         String?       // Comment le client a été acquis
+  notes          String?
+  
+  // Relations
+  devis          Devis[]
+  factures       Facture[]
+  chantiers      Chantier[]
+  interventions  Intervention[]
+  documents      Document[]
+  
+  // Métadonnées
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  createdBy      String?
+  createdByUser  User?    @relation(fields: [createdBy], references: [id])
+
+  @@map("clients")
+}
+
+// ===== CHANTIERS =====
+model Chantier {
+  id          String @id @default(cuid())
+  name        String
+  reference   String @unique
+  description String?
+  
+  // Localisation
+  address     String?
+  postalCode  String?
+  city        String?
+  
+  // Dates
+  startDate   DateTime?
+  endDate     DateTime?
+  
+  // Informations financières
+  budgetHT    Decimal? @db.Decimal(10, 2)
+  budgetTTC   Decimal? @db.Decimal(10, 2)
+  
+  // Relations
+  clientId    String
+  client      Client         @relation(fields: [clientId], references: [id])
+  devis       Devis[]
+  factures    Facture[]
+  commandes   Commande[]
+  documents   Document[]
+  stockMovements StockMovement[]
+  timeEntries TimeEntry[]
+  interventions Intervention[]
+  
+  // Métadonnées
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("chantiers")
+}
+
+// ===== DEVIS =====
+model Devis {
+  id            String      @id @default(cuid())
+  number        String      @unique
+  title         String
+  description   String?
+  status        DevisStatus @default(BROUILLON)
+  
+  // Dates
+  date          DateTime    @default(now())
+  validityDate  DateTime
+  
+  // Montants
+  totalHT       Decimal     @db.Decimal(10, 2)
+  totalTTC      Decimal     @db.Decimal(10, 2)
+  vatAmount     Decimal     @db.Decimal(10, 2)
+  
+  // Relations
+  clientId      String
+  client        Client      @relation(fields: [clientId], references: [id])
+  chantierId    String?
+  chantier      Chantier?   @relation(fields: [chantierId], references: [id])
+  items         DevisItem[]
+  factures      Facture[]   // Factures générées depuis ce devis
+  
+  // Métadonnées
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  createdBy     String?
+  createdByUser User?       @relation(fields: [createdBy], references: [id])
+
+  @@map("devis")
+}
+
+model DevisItem {
+  id          String  @id @default(cuid())
+  description String
+  quantity    Decimal @db.Decimal(10, 3)
+  unitPrice   Decimal @db.Decimal(10, 2)
+  vatRate     Decimal @db.Decimal(5, 2)
+  totalHT     Decimal @db.Decimal(10, 2)
+  
+  // Relations
+  devisId     String
+  devis       Devis   @relation(fields: [devisId], references: [id], onDelete: Cascade)
+  
+  // Métadonnées
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("devis_items")
+}
+
+// ===== FACTURES =====
+model Facture {
+  id            String        @id @default(cuid())
+  number        String        @unique
+  title         String
+  description   String?
+  status        FactureStatus @default(BROUILLON)
+  type          String        @default("VENTE") // VENTE, ACOMPTE, SITUATION
+  
+  // Dates
+  date          DateTime      @default(now())
+  dueDate       DateTime
+  paidDate      DateTime?
+  
+  // Montants
+  totalHT       Decimal       @db.Decimal(10, 2)
+  totalTTC      Decimal       @db.Decimal(10, 2)
+  vatAmount     Decimal       @db.Decimal(10, 2)
+  paidAmount    Decimal       @default(0) @db.Decimal(10, 2)
+  
+  // Relations
+  clientId      String
+  client        Client         @relation(fields: [clientId], references: [id])
+  chantierId    String?
+  chantier      Chantier?      @relation(fields: [chantierId], references: [id])
+  devisId       String?
+  devis         Devis?         @relation(fields: [devisId], references: [id])
+  items         FactureItem[]
+  payments      Payment[]
+  
+  // Métadonnées
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  createdBy     String?
+  createdByUser User?          @relation(fields: [createdBy], references: [id])
+
+  @@map("factures")
+}
+
+model FactureItem {
+  id          String  @id @default(cuid())
+  description String
+  quantity    Decimal @db.Decimal(10, 3)
+  unitPrice   Decimal @db.Decimal(10, 2)
+  vatRate     Decimal @db.Decimal(5, 2)
+  totalHT     Decimal @db.Decimal(10, 2)
+  
+  // Relations
+  factureId   String
+  facture     Facture @relation(fields: [factureId], references: [id], onDelete: Cascade)
+  
+  // Métadonnées
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("facture_items")
+}
+
+// ===== PAIEMENTS =====
+model Payment {
+  id          String   @id @default(cuid())
+  amount      Decimal  @db.Decimal(10, 2)
+  paymentDate DateTime @default(now())
+  method      String   // VIREMENT, CHEQUE, ESPECES, CB
+  reference   String?
+  notes       String?
+  
+  // Relations
+  factureId   String
+  facture     Facture  @relation(fields: [factureId], references: [id])
+  
+  // Métadonnées
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("payments")
+}
+
+// ===== ACHATS ET FOURNISSEURS =====
+model Fournisseur {
+  id         String @id @default(cuid())
+  name       String
+  siret      String?
+  vatNumber  String?
+  
+  // Contact
+  contactName String?
+  email      String?
+  phone      String?
+  
+  // Adresse
+  address    String?
+  postalCode String?
+  city       String?
+  country    String @default("France")
+  
+  // Relations
+  commandes  Commande[]
+  
+  // Métadonnées
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@map("fournisseurs")
+}
+
+model Commande {
+  id            String        @id @default(cuid())
+  number        String        @unique
+  status        CommandeStatus @default(EN_ATTENTE)
+  
+  // Dates
+  orderDate     DateTime      @default(now())
+  deliveryDate  DateTime?
+  receivedDate  DateTime?
+  
+  // Montants
+  totalHT       Decimal       @db.Decimal(10, 2)
+  totalTTC      Decimal       @db.Decimal(10, 2)
+  vatAmount     Decimal       @db.Decimal(10, 2)
+  
+  // Relations
+  fournisseurId String
+  fournisseur   Fournisseur    @relation(fields: [fournisseurId], references: [id])
+  chantierId    String?
+  chantier      Chantier?      @relation(fields: [chantierId], references: [id])
+  items         CommandeItem[]
+  
+  // Métadonnées
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  @@map("commandes")
+}
+
+model CommandeItem {
+  id          String   @id @default(cuid())
+  description String
+  quantity    Decimal  @db.Decimal(10, 3)
+  unitPrice   Decimal  @db.Decimal(10, 2)
+  vatRate     Decimal  @db.Decimal(5, 2)
+  totalHT     Decimal  @db.Decimal(10, 2)
+  
+  // Relations
+  commandeId  String
+  commande    Commande @relation(fields: [commandeId], references: [id], onDelete: Cascade)
+  
+  // Métadonnées
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("commande_items")
+}
+
+// ===== STOCK =====
+model Product {
+  id          String @id @default(cuid())
+  name        String
+  description String?
+  reference   String @unique
+  category    String?
+  unit        String @default("unité")
+  
+  // Prix
+  purchasePrice Decimal? @db.Decimal(10, 2)
+  salePrice     Decimal? @db.Decimal(10, 2)
+  
+  // Stock
+  currentStock  Decimal @default(0) @db.Decimal(10, 3)
+  minStock      Decimal @default(0) @db.Decimal(10, 3)
+  maxStock      Decimal? @db.Decimal(10, 3)
+  
+  // Relations
+  movements     StockMovement[]
+  
+  // Métadonnées
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@map("products")
+}
+
+model Warehouse {
+  id          String @id @default(cuid())
+  name        String
+  description String?
+  address     String?
+  
+  // Relations
+  movements   StockMovement[]
+  
+  // Métadonnées
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("warehouses")
+}
+
+model StockMovement {
+  id          String            @id @default(cuid())
+  type        StockMovementType
+  quantity    Decimal           @db.Decimal(10, 3)
+  unitPrice   Decimal?          @db.Decimal(10, 2)
+  reference   String?
+  notes       String?
+  
+  // Relations
+  productId   String
+  product     Product   @relation(fields: [productId], references: [id])
+  warehouseId String?
+  warehouse   Warehouse? @relation(fields: [warehouseId], references: [id])
+  chantierId  String?
+  chantier    Chantier? @relation(fields: [chantierId], references: [id])
+  
+  // Métadonnées
+  movementDate DateTime @default(now())
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@map("stock_movements")
+}
+
+// ===== TEMPS ET PLANNING =====
+model TimeEntry {
+  id          String   @id @default(cuid())
+  description String?
+  startTime   DateTime
+  endTime     DateTime?
+  duration    Int?     // En minutes
+  
+  // Relations
+  userId      String
+  user        User      @relation(fields: [userId], references: [id])
+  chantierId  String?
+  chantier    Chantier? @relation(fields: [chantierId], references: [id])
+  
+  // Métadonnées
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("time_entries")
+}
+
+// ===== INTERVENTIONS ET SAV =====
+model Intervention {
+  id            String             @id @default(cuid())
+  title         String
+  description   String?
+  type          InterventionType
+  status        InterventionStatus @default(PLANIFIEE)
+  priority      String             @default("NORMALE") // BASSE, NORMALE, HAUTE, URGENTE
+  
+  // Dates
+  scheduledDate DateTime
+  startDate     DateTime?
+  endDate       DateTime?
+  
+  // Relations
+  clientId      String
+  client        Client @relation(fields: [clientId], references: [id])
+  chantierId    String?
+  chantier      Chantier? @relation(fields: [chantierId], references: [id])
+  assignedToId  String?
+  assignedTo    User?     @relation(fields: [assignedToId], references: [id])
+  
+  // Métadonnées
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@map("interventions")
+}
+
+// ===== DOCUMENTS =====
+model Document {
+  id          String      @id @default(cuid())
+  name        String
+  type        DocumentType
+  mimeType    String
+  size        Int
+  path        String
+  url         String?
+  
+  // Relations
+  clientId    String?
+  client      Client?   @relation(fields: [clientId], references: [id])
+  chantierId  String?
+  chantier    Chantier? @relation(fields: [chantierId], references: [id])
+  
+  // Métadonnées
+  uploadedAt  DateTime @default(now())
+  uploadedBy  String?
+
+  @@map("documents")
+}
+
+// ===== AUDIT ET LOGS =====
+model AuditLog {
+  id        String   @id @default(cuid())
+  action    String   // CREATE, UPDATE, DELETE, LOGIN, LOGOUT
+  entity    String   // Table concernée
+  entityId  String?  // ID de l'entité concernée
+  oldValues Json?    // Anciennes valeurs
+  newValues Json?    // Nouvelles valeurs
+  ipAddress String?
+  userAgent String?
+  level     LogLevel @default(INFO)
+  
+  // Relations
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id])
+  
+  // Métadonnées
+  createdAt DateTime @default(now())
+
+  @@map("audit_logs")
+}
+
+// ===== NOTIFICATIONS =====
+model Notification {
+  id        String   @id @default(cuid())
+  title     String
+  message   String
+  type      String   @default("INFO") // INFO, WARNING, ERROR, SUCCESS
+  isRead    Boolean  @default(false)
+  
+  // Relations
+  userId    String
+  
+  // Métadonnées
+  createdAt DateTime @default(now())
+  readAt    DateTime?
+
+  @@map("notifications")
+}
+
+// ===== CONFIGURATION SYSTÈME =====
+model SystemConfig {
+  id          String   @id @default(cuid())
+  key         String   @unique
+  value       String
+  description String?
+  isPublic    Boolean  @default(false) // Si true, peut être lu par le frontend
+  
+  // Métadonnées
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("system_config")
+}
